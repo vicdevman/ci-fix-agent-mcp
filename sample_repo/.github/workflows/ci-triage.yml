@@ -1,0 +1,43 @@
+name: CI triage
+
+# Runs automatically whenever the "CI" workflow finishes with a failure.
+# Note: GitHub only picks up workflow_run triggers from the default branch.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  actions: read        # download the failed run's logs
+  contents: read       # clone the failing commit
+  pull-requests: write # comment on the PR
+  issues: write        # PR comments go through the issues API
+
+jobs:
+  triage:
+    if: github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the triage agent
+        uses: actions/checkout@v4
+        with:
+          repository: YOUR-GITHUB-USER/ci-triage-agent # change to where you pushed the agent
+          path: agent
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install the agent
+        run: pip install -r agent/requirements.txt
+
+      - name: Diagnose, fix, verify and comment
+        working-directory: agent
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          python main.py
+          --repo ${{ github.repository }}
+          --run-id ${{ github.event.workflow_run.id }}
+          --post
