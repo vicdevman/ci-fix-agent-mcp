@@ -9,11 +9,11 @@ client: Claude Desktop, Gemini CLI, VS Code, or someone else's agent.
 import os
 
 from dotenv import load_dotenv
-from google import genai
 from mcp.server.mcpserver import MCPServer
 
 from triage.condense import condense
 from triage.github_api import GitHub
+from triage.llm import make_client
 from triage.tools import Workspace
 
 load_dotenv()
@@ -26,8 +26,9 @@ def summarize_failed_run(repo: str, run_id: str = "") -> dict:
     """Fetch a failed GitHub Actions run and return a short Gemma-written failure summary."""
     github = GitHub(os.environ["GITHUB_TOKEN"], repo)
     run = github.get_run(run_id or None)
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-    summary = condense(client, os.getenv("TRIAGE_MODEL", "gemma-4-26b-a4b-it"), github.get_run_log(run["id"]))
+    client = make_client(os.environ["GEMINI_API_KEY"])
+    models = [os.getenv("TRIAGE_MODEL", "gemma-4-26b-a4b-it"), "gemma-4-31b-it", "gemini-3.5-flash-lite"]
+    summary = condense(client, models, github.get_run_log(run["id"]))
     summary["run_url"] = run["html_url"]
     return summary
 

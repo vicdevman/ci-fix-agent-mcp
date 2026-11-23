@@ -20,13 +20,13 @@ import time
 from pathlib import Path
 
 from dotenv import load_dotenv
-from google import genai
 from mcp import Client
 from mcp.client.stdio import StdioServerParameters
 
 from triage.agent import call_mcp_tool, run_agent
 from triage.condense import condense
 from triage.github_api import GitHub
+from triage.llm import make_client
 from triage.report import build_report
 from triage.tools import Workspace
 
@@ -45,9 +45,10 @@ async def main():
 
     sys.stdout.reconfigure(encoding="utf-8")  # the report contains emoji; Windows consoles default to cp1252
     load_dotenv(PROJECT_DIR / ".env")
-    gemini = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-    triage_model = os.getenv("TRIAGE_MODEL", "gemma-4-26b-a4b-it")
-    fix_model = os.getenv("FIX_MODEL", "gemini-3.8-flash")
+    gemini = make_client(os.environ["GEMINI_API_KEY"])
+    # First model is preferred; the next ones are used only if it stays busy.
+    triage_models = [os.getenv("TRIAGE_MODEL", "gemma-4-26b-a4b-it"), "gemma-4-31b-it", "gemini-3.5-flash-lite"]
+    fix_models = [os.getenv("FIX_MODEL", "gemini-3.8-flash"), "gemini-3.6-flash", "gemini-3.5-flash-lite"]
 
     workdir = WORK_DIR / time.strftime("%Y%m%d-%H%M%S")
     github, pr_number = None, None
@@ -70,12 +71,12 @@ async def main():
     if before["passed"]:
         sys.exit("   The tests pass on this commit, so there is nothing to fix here.")
 
-    print(f"2. Condensing the log with {triage_model}")
-    summary = condense(gemini, triage_model, raw_log)
-    print(f"   {summary['log_chars_in']:,} chars of log -> {summary['summary_chars']:,} char summary")
+    print(f"2. Condensing the log with {triage_models[0]}")
+    summary = condense(gemini, triage_models, raw_log)
+    print(f"   {summary['log_chars_in']:,} chars of log -> {summary['summary_chars']:,} char summary ({summary['model']})")
     print(f"   {summary.get('summary', '')}")
 
-    print(f"3. Diagnosing and fixing with {fix_model}, using tools from our MCP server")
+    print(f"3. Diagnosing and fixing with {fix_models[0]}, using tools from our MCP server")
     server = StdioServerParameters(
         command=sys.executable,
         args=[str(PROJECT_DIR / "mcp_server.py")],
@@ -83,7 +84,7 @@ async def main():
         cwd=str(PROJECT_DIR),
     )
     async with Client(server) as mcp:
-        result = await run_agent(gemini, fix_model, mcp, summary)
+        result = await run_agent(gemini, fix_models, mcp, summary)
         diff = (await call_mcp_tool(mcp, "get_diff", {}))["diff"]
 
     print("4. Verifying independently (outside the agent and the MCP server)")

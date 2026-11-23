@@ -8,6 +8,8 @@ model reads it first and returns only what matters.
 import json
 import re
 
+from triage.llm import generate
+
 SIGNAL = re.compile(
     r"(error|fail|failed|traceback|exception|assert|expected|raise|exit code|\.py:\d+)",
     re.IGNORECASE,
@@ -49,10 +51,11 @@ def _extract_json(text):
     return json.loads(match.group(0))
 
 
-def condense(client, model, raw_log):
+def condense(client, models, raw_log):
     filtered = prefilter(raw_log)
-    response = client.models.generate_content(model=model, contents=PROMPT.format(log=filtered))
+    response, used = generate(client, models, contents=PROMPT.format(log=filtered))
     summary = _extract_json(response.text)
+    summary["model"] = used
     summary["summary_chars"] = len(json.dumps(summary))
     summary["log_chars_in"] = len(raw_log)
     return summary

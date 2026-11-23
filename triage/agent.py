@@ -9,6 +9,8 @@ import json
 
 from google.genai import types
 
+from triage.llm import agenerate
+
 SYSTEM_PROMPT = """You are a CI triage engineer. A build is failing and you must fix it.
 
 Rules:
@@ -53,7 +55,7 @@ async def call_mcp_tool(mcp, name, args):
         return {"error" if result.is_error else "result": text}
 
 
-async def run_agent(gemini, model, mcp, failure_summary, max_steps=12, on_event=print):
+async def run_agent(gemini, models, mcp, failure_summary, max_steps=12, on_event=print):
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_PROMPT,
         tools=[types.Tool(function_declarations=await gemini_tools_from_mcp(mcp))],
@@ -67,7 +69,7 @@ async def run_agent(gemini, model, mcp, failure_summary, max_steps=12, on_event=
     ]
 
     for step in range(1, max_steps + 1):
-        response = await gemini.aio.models.generate_content(model=model, contents=contents, config=config)
+        response, _ = await agenerate(gemini, models, contents=contents, config=config)
         # Send the model's full turn back, so any thought signatures are kept.
         contents.append(response.candidates[0].content)
 

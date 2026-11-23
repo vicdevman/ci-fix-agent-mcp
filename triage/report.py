@@ -36,5 +36,5 @@ def build_report(summary, agent_result, diff, before, after):
 ```
 </details>
 
-<sub>Gemma condensed a {summary.get('log_chars_in', 0):,}-character CI log into a {summary.get('summary_chars', 0):,}-character summary before Gemini diagnosed it. Agent steps: {agent_result['steps']}.</sub>
+<sub>{summary.get('model', 'The triage model')} condensed a {summary.get('log_chars_in', 0):,}-character CI log into a {summary.get('summary_chars', 0):,}-character summary before diagnosis. Agent steps: {agent_result['steps']}.</sub>
 """
