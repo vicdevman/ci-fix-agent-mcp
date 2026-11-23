@@ -21,7 +21,7 @@ jobs:
       - name: Get the triage agent
         uses: actions/checkout@v4
         with:
-          repository: YOUR-GITHUB-USER/ci-triage-agent # change to where you pushed the agent
+          repository: vicdevman/ci-fix-agent-mcp # change to your own fork of the agent repo
           path: agent
 
       - uses: actions/setup-python@v5
